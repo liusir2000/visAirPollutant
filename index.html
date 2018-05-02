@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>PM2.5 Distrabution of Hua Dong</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+<style>
+body {
+	font-family: Monospace;
+	background-color: #f0f0f0;
+	margin: 0px;
+	overflow: hidden;
+}
+</style>
+</head>
+
+<body>
+<canvas id="debug" style="position:absolute; top:100px"></canvas>
+		<div style="position: absolute; top: 10px; width: 100%; text-align: center; ">
+			<div class="filterBlock" >
+				<input type="text" id="datestr" placeholder="Enter date(e.g.20140722)"/>
+				<a href="#" id="searchData"  onclick="searchData();">Load data</a>
+				Lon<input type="text" id="Lon" size="5" placeholder="°E"/>
+				Lat<input type="text" id="Lat" size="5" placeholder="°N"/>
+				height<input type="text" id="Height" size="5" placeholder="km"/>
+				<a href="#" id="searchPosition" onclick="onSearchPosition();">search</a>
+				value range：<input type="text" id="fromValue" size="5" placeholder="Extinction coefficient from"/>
+				to<input type="text" id="toValue" size="5" placeholder="Extinction coefficient to"/>
+				<a href="#" id="filter" onclick="onFilterData();">Filtering Data</a>
+                <a href="#" id="help" onclick="onShowHelp();">Key description</a>				
+				<br>				
+			</div>
+			<p id='particaleInf'></p>
+		</div>
+<div>
+<script type="text/javascript" src="build/three.js"></script>
+<script src="js/lights/RectAreaLightUniformsLib.js"></script>
+<script src="js/libs/stats.min.js"></script>
+<script src="js/pm/Lut.js"></script>
+<script src="js/pm/dealPos.js"></script>
+<script src="js/pm/SvgMapDeal.js"></script>
+<script src="js/pm/pmModel.js"></script>
+<script src="js/pm/onEvent.js"></script>
+
+<script>
+// From d3-threeD.js
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
+var byteArray , dataLoaded;
+ 
+function readArr(filename){
+if (filename == '')
+{
+return false;
+}
+//console.log(int16View)
+var myDate1 = new Date();
+console.log('data load start at:');
+console.log(myDate1);
+var oReq = new XMLHttpRequest();
+dataLoaded = false;
+oReq.open("get", filename, true);
+//oReq.responseType = "blob";
+oReq.responseType = "arraybuffer";
+oReq.onreadystatechange = function () {
+    if (oReq.readyState==4 && oReq.status==200) {
+        var arrayBuffer = oReq.response;
+        byteArray = new Uint8Array(arrayBuffer);
+        var i = byteArray.length;
+		dataLoaded = true;
+        var myDate2 = new Date();
+		var CDate = myDate2 - myDate1;		
+		console.log('data load finished at:');
+	    console.log(myDate2);
+		console.log('total time ms is:');
+	    console.log(CDate);		
+		addParticles();
+		console.log(i);	
+    }
+}
+oReq.send();
+return byteArray;
+}
+</script>
+
+
+
+<script>
+
+/// Part from g0v/twgeojson
+/// Graphic Engine and Geo Data Init Functions
+
+var init3d = function( font ){
+
+	/// Global : renderer
+	renderer = new THREE.WebGLRenderer( { antialias: true } );
+	renderer.setClearColor( 0xb0b0b0 );
+	renderer.setPixelRatio( window.devicePixelRatio );
+	renderer.setSize( window.innerWidth, window.innerHeight );
+	
+	/// Global : camera
+	camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 5000 );
+	initialPosition();
+
+	/// Global : group
+	group = new THREE.Group();
+	scene.add( group );
+	HGroupLonLatGrid = new THREE.Group();
+	LonGroupLonLatGrid = new THREE.Group();
+	LatGroupLonLatGrid = new THREE.Group();
+	group.add(HGroupLonLatGrid);
+	group.add(LonGroupLonLatGrid);
+	group.add(LatGroupLonLatGrid);
+	
+	//Global :points
+	points = new THREE.Group();
+	group.add( points );	
+	
+
+	//add point light
+	var sphere = new THREE.SphereGeometry( 5, 16, 8 );
+	light = new THREE.PointLight( 0xfffff, 2, 50 );
+	light.add( new THREE.Mesh( sphere, new THREE.MeshBasicMaterial( { color: 0x00000 } ) ) );
+	scene.add( light );
+
+	 var rectLight = new THREE.RectAreaLight( 0xFFFFFF, undefined, 2, 10 );
+				rectLight.matrixAutoUpdate = true;
+				rectLight.intensity = 80.0;
+				rectLight.position.set( 5, 5, 0 );	
+	scene.add( rectLight );			
+
+	/// ambient light
+	var ambientLight = new THREE.AmbientLight(0xffffff);
+	scene.add( ambientLight );
+                var pointLight = new THREE.PointLight(0XFFFFFF);
+				ambientLight = new THREE.AmbientLight(0XFFFFFF);
+ 
+                pointLight.position.x = 10;
+                pointLight.position.y = 50;
+                pointLight.position.z = 150;
+ 
+                scene.add(pointLight);	
+				
+	/// backgroup grids
+	//var helper = new THREE.GridHelper( 500, 10 );
+	//helper.rotation.x = Math.PI / 2;
+	//group.add( helper );
+	
+	
+	addLonLatHeight( font );
+	
+	var obj = initSVGObject();
+	addGeoObject( group, obj );	
+
+    // add raycaster and mouse
+	raycaster = new THREE.Raycaster();
+	mouse = new THREE.Vector2();
+	
+};
+
+</script>
+
+<script>
+	function animate() {
+
+		/// compatibility : http://caniuse.com/requestanimationframe
+		requestAnimationFrame( animate ); 		
+		   render();
+	}
+
+	function render() {
+		        group.rotation.y += ( 0-targetRotationX - group.rotation.y ) * 0.05;	
+                group.rotation.x += ( targetRotationY - group.rotation.x ) * 0.05;				
+				
+
+        //console.log( light.position	);		
+		renderer.render( scene, camera );
+	}
+
+//initial the camera position 
+function initialPosition()
+{
+  camera.position.set( 0, 0, 5 * windowHalfY);
+  //camera.position.set( 0, 0, 5 * windowHalfY );
+  camera.position.y = windowHalfY / 2 ;
+  targetRotationX = 0;
+  targetRotationY = -0.76;
+  return false;
+}
+
+						
+</script>
+
+<script>
+
+const FROMLAT = 39.0 , TOLAT = 23.0, FROMLON = 113.0, TOLON = 123.0, //the longitude and latitude range of grid data
+ LONCOUNT = 120, LATCOUNT = 160, MAXHEIGHT = 3000, HCOUNT = 100,
+ HGRIDNUM = 15, LATGRIDNUM = 16, LONGRIDNUM = 10,
+ FROMGRIDX = -200, TOGRIDX = 200, FROMGRIDY = 300, TOGRIDY = -300,   //get axis range in the map
+ FROMGRIDH = 0, TOGRIDH = 600, GRIDLENGTHX = 400 ,GRIDLENGTHY = 600,GRIDLENGTHH = 600;
+ SVGFROMGRIDX = 0, SVGTOGRIDX = 1254.75591, SVGFROMGRIDY = 653.24409, SVGTOGRIDY = 0,  //
+ SVGFROMLAT = 38.221992 , SVGTOLAT = 23.235489, SVGFROMLON = 113.573463, SVGTOLON = 122.698708,  //SVG map axis range 
+ VALUEMAX = 2.0;
+ 
+	var gridStepX = GRIDLENGTHX / LONGRIDNUM;
+	var gridStepY = GRIDLENGTHY / LATGRIDNUM;
+	var gridStepH = GRIDLENGTHH / HGRIDNUM; 
+	/// Main
+
+	var renderer;
+	var scene, camera, group, HGroupLonLatGrid,LonGroupLonLatGrid,LatGroupLonLatGrid,points, light, lut,legend,labels, legendLayout;
+	var showPlante;
+	var planteshow = false;
+	var particleshow = true;
+	legendLayout = 'vertical';
+	var Datestr = GetQueryString('date');         //save the date string
+
+	var targetRotation = 0;
+	var targetRotationX = 0;
+	var targetRotationY = 0;
+	var targetRotationOnMouseDown = 0;
+	var targetRotationOnMouseDownX = 0;
+	var targetRotationOnMouseDownY = 0;
+	
+	var raycaster,mouse;
+	
+	var plant,zpostion = 0;
+
+	var mouseX = 0,INTERSECTED;
+	var mouseY = 0;
+	var selection = null;
+	var mouseXOnMouseDown = 0;
+	var mouseYOnMouseDown = 0;
+	var particales = 1000;
+	var addOrNot = true;              //The particle system is increased or not
+	var showParticleInf = false;       //whether show the particles
+	var mapIndex = 0;
+	var maps;
+	var showPlaneParams;            // show the profile param[ 2 ,GRIDLENGTHY, GRIDLENGTHH,  selection.geometry.vertices[1].x ,0, TOGRIDH / 2, imagefile, 'lon', i];
+	                                //x,y,z direct thickness,position x,y,z,image file name ，which slice direct(lon,lat,lev)，index of the slice map
+	var showWhichProfile = 'lon';     //which slice direct
+
+	var windowHalfX = window.innerWidth / 2;
+	var windowHalfY = window.innerHeight / 2;
+
+	var container = document.createElement( 'div' );	
+	document.body.appendChild( container );	
+	
+	//get distribution dynamicly
+    var segmentsy = 161;
+	var segmentsx = 121;	
+	var positions = new Float32Array( segmentsx * segmentsy * 3 * 3 * 2 );
+	var colors = new Float32Array( segmentsx * segmentsy * 3 * 3 * 2);
+	var normals = new Float32Array( segmentsx * segmentsy * 3 * 3 * 2);	
+
+	// Global : scene
+	scene = new THREE.Scene();
+	scene.fog = new THREE.Fog( 0x050505, 2000, 3500 );
+		
+var loader = new THREE.FontLoader();	    //load the font
+loader.load( 'fonts/helvetiker_regular.typeface.json', function ( font ) {
+    //setLegend(0);
+	init3d( font );
+	
+	if (Datestr)
+	{
+	  document.getElementById('datestr').value = Datestr;
+	 }
+	setLegend(); 
+    readArr( "./data/FY3_PM_" + Datestr + ".dat" );
+	
+	container.appendChild( renderer.domElement );
+
+
+	document.addEventListener( 'mousedown', onDocumentMouseDown, false );
+	document.addEventListener( 'touchstart', onDocumentTouchStart, false );
+	document.addEventListener( 'touchmove', onDocumentTouchMove, false );
+	window.addEventListener( 'resize', onWindowResize, false );
+	document.addEventListener( 'mousemove', onMouseMove, false );
+	document.addEventListener( 'keydown', onKeyDown, false );
+	animate();
+	} );
+</script>
+
+
+</body>
+</html>
