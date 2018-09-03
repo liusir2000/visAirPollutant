@@ -82,7 +82,7 @@ function onFilterData()
 	
 	
 //Add particles	
-function onAddParticles()
+function onAddParticales()
 	{
 	if (particales >160000){ 
 	   return false; 
@@ -90,6 +90,7 @@ function onAddParticles()
 	setLegend();
 	addOrNot = true;
 	particales = particales + 1000 ;
+    var myDate1 = new Date();		
     console.log("AddParticales, total number is:");	
     console.log(particales);
     if (byteArray)
@@ -100,8 +101,7 @@ function onAddParticles()
        {
 	     var datafilename = "./data/FY3_PM_" + Datestr + ".dat";
 	     readArr( datafilename ); 		 
-	   }
-	   
+	   }     
     var myDate2 = new Date();
     var cDate = myDate2 - myDate1;
     console.log('render finish at:');
